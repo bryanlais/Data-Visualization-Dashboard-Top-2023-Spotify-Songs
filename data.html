@@ -64,6 +64,14 @@
                </div>
                <div id="chart-container"></div>
             </div>
+            <br>
+            <div class="card text-center">
+               <div class="card-header">
+                  Area Chart
+                  <br>
+               </div>
+               <div id="area-chart"></div>
+            </div>
          </div>
       </div>
       <!--
@@ -117,7 +125,7 @@
          createParallelCoordinates(data)
       })
 
-      d3.csv("9x9.csv").then(function(data) { 
+      d3.csv("10x10.csv").then(function(data) { 
          dataValues.push(data)
          // First get column values in order to populate the dropdown menu of variables (dictionary keys)
          // The reason why we do dataValues[0][0] is because the whole data for some reason is in index 0, and then the 2nd index refers to each row. 
@@ -145,7 +153,7 @@
                dropdownMenu.appendChild(variable);
                // Add a click event listener to show which item is selected/active.
                variable.addEventListener('click', function() {
-                   // Grab all items in the dropdownMenu.
+                   // Grab all items in the dropdownMenu.Q
                   let dropdownItems = document.querySelectorAll('.dropdown-item');
                   // Remove active status for all other variables!
                   dropdownItems.forEach(item => {
@@ -162,9 +170,12 @@
                   createBiplot(biVals)
                   //createMDS(mdsVals)
                   createParallelCoordinates(parallel)
+                  //
+                  createAreaChart(selectedVariable.textContent)
                });
             }
          }
+         createAreaChart("released_day")
          createBarChart("released_day");         
          document.getElementById("released_day").classList.add("active")
       });   
@@ -173,11 +184,86 @@
       function getRandomColor() {
                let letters = '0123456789ABCDEF';
                let color = '#';
-               for (var i = 0; i < 6; i++) {
+               for (let i = 0; i < 6; i++) {
                   color += letters[Math.floor(Math.random() * 16)];
                }
                return color;
                }
+
+      function createAreaChart(variable) {       
+         
+      // set the dimensions and margins of the graph
+      let margin = {top: 10, right: 30, bottom: 30, left: 50},
+         width = 460 - margin.left - margin.right,
+         height = 400 - margin.top - margin.bottom;
+
+      let data = dataValues[0]
+      
+      // Create an SVG container for the chart
+      let svg = d3.select("#area-chart")
+         .html("") // Clear the previous chart
+         .append("svg")
+         .attr("width", width + margin.left + margin.right)
+         .attr("height", height + margin.top + margin.bottom)
+         .append("g")
+         .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+
+      // Add X axis --> it is a date format
+      let x = d3.scaleLinear()
+            .domain([1, 12])
+            .range([0, width]);
+      svg.append("g")
+         .attr("transform", "translate(0," + height + ")")
+         .call(d3.axisBottom(x));
+
+      // Add Y axis
+      let y = d3.scaleLinear()
+         .domain([0, d3.max(data, function(d) { return +d[variable]; })])
+         .range([ height, 0 ]);
+      svg.append("g")
+         .call(d3.axisLeft(y));
+
+      // Add x-axis
+      svg.append("g")
+         .attr("class", "x-axis")
+         .attr("transform", `translate(0,${height})`)
+         .call(d3.axisBottom(x));
+
+      // Add x-axis label
+      svg.append("text")
+         .attr("class", "x-label")
+         .attr("x", width / 2)
+         .attr("y", height + margin.bottom)
+         .style("text-anchor", "middle")
+         .text("Released Month");
+
+      // Add y-axis
+      svg.append("g")
+         .attr("class", "y-axis")
+         .call(d3.axisLeft(y));
+
+      // Add y-axis label
+      svg.append("text")
+         .attr("class", "y-label")
+         .attr("transform", "rotate(-90)")
+         .attr("y", 0 - margin.left) // Adjust the position as needed
+         .attr("x", 0 - height / 2) // Adjust the position as needed
+         .attr("dy", "1em")
+         .style("text-anchor", "middle")
+         .text(variable);
+
+      // Add the area
+      svg.append("path")
+         .datum(data)
+         .attr("fill", "#cce5df")
+         .attr("stroke", "#69b3a2")
+         .attr("stroke-width", 1.5)
+         .attr("d", d3.area()
+         .x(function(d) { return x(d.released_month) })
+         .y0(y(0))
+         .y1(function(d) { return y(d[variable]) })
+         )
+      }
 
       //Create Parallel Coordinates
       function createParallelCoordinates(data) {
