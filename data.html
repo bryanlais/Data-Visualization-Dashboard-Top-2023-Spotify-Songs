@@ -31,7 +31,7 @@
             <div class="jumbotron">
                <h2> Top 2023 Spotify Songs Analysis Dashboard </h2>
                <p class="lead"> This is a data visualization dashboard in order to analyze the Top Spotify Songs Listened in 2023. </p>
-               <p class="lead"> Current Variable: <span style="font-weight: bold;" id="selectedVariable"> bpm </span> </p>
+               <p class="lead"> Current Variable: <span style="font-weight: bold;" id="selectedVariable"> released_day </span> </p>
                <button class="btn btn-secondary dropdown-toggle" type="button" id="dropdownMenuButton" data-display="static" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
                   Select Variable 
                </button>
@@ -154,13 +154,19 @@
                   // Make specific variable active.
                   this.classList.add('active');
                   selectedVariable.textContent = this.textContent;
+                  //Reset state of the dashboard.
+                  colorRules={"released_day":{},"bpm":{},"danceability_%":{},"valence_%":{},"energy_%":{},
+      "acousticness_%":{},"liveness_%":{},"speechiness_%":{},"mode":{}}
                   createBarChart(selectedVariable.textContent);
                   //createPieChart(selectedVariable.textContent);
+                  createBiplot(biVals)
+                  //createMDS(mdsVals)
+                  createParallelCoordinates(parallel)
                });
             }
          }
-         createBarChart("bpm");         
-         document.getElementById("bpm").classList.add("active")
+         createBarChart("released_day");         
+         document.getElementById("released_day").classList.add("active")
       });   
 
       //Create random colors when clicking on a bar (auto-assign!)
@@ -181,7 +187,7 @@
          // Create attributes for the width and height :> 
          let margin = {top: 30, right: 10, bottom: 10, left: 0},
          width = 800 - margin.left - margin.right,
-         height = 200 - margin.top - margin.bottom;
+         height = 400 - margin.top - margin.bottom;
 
          // append the svg object to the body of the page
          let svg = 
@@ -629,7 +635,6 @@
                         colorRules[variable.textContent][val] = assignedColor 
                      }
                      createBiplot(biVals)
-                     console.log(biVals)
                      createMDS(mdsVals)
                      createParallelCoordinates(parallel)
                   });
