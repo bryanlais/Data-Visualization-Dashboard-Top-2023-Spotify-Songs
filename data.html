@@ -27,7 +27,6 @@
          <div class="col-3">
             <br>
             <br>
-            <br>
             <div class="jumbotron">
                <h2> Top 2023 Spotify Songs Analysis Dashboard </h2>
                <p class="lead"> This is a data visualization dashboard in order to analyze the Top Spotify Songs Listened in 2023. </p>
@@ -37,8 +36,19 @@
                </button>
                <div class="dropdown-menu" aria-labelledby="dropdownMenuButton"></div>
             </div>
+            <div class="card text-center">
+               <div class="card-header">
+                  Student Info
+               </div>
+               <br>
+               <p class="lead"> This dashboard was created by Bryan Lai on December 7th, 2023. If there are any inquiries, please send an e-mail to bryanjlais@gmail.com. </p>
+               <img src="brybai.png" class="rounded-circle mx-auto" alt="Bryan Lai" style="width:100px">
+               <br>
+            </div>
          </div>
          <div class="col-5">
+            <br>
+            <br>
             <div class="card text-center">
                <div class="card-header">
                   Parallel Coordinates
@@ -54,7 +64,6 @@
             </div>
          </div>
          <div class="col-4">
-            <br>
             <br>
             <br>
             <div class="card text-center">
@@ -103,6 +112,7 @@
       let mdsVals = []
       let biVals = []
       let parallel = [] 
+      let areaVals = []
       //This global dictionary will be used in the functions to determine color changes!
       let colorRules = {"released_day":{},"bpm":{},"danceability_%":{},"valence_%":{},"energy_%":{},
       "acousticness_%":{},"liveness_%":{},"speechiness_%":{},"mode":{}}
@@ -123,6 +133,10 @@
       d3.csv("parallel.csv").then(function(data) {
          parallel = data
          createParallelCoordinates(data)
+      })
+
+      d3.csv("area.csv").then(function(data){
+         areaVals = data
       })
 
       d3.csv("10x10.csv").then(function(data) { 
@@ -197,8 +211,8 @@
          width = 460 - margin.left - margin.right,
          height = 400 - margin.top - margin.bottom;
 
-      let data = dataValues[0]
-      
+      let data = areaVals
+
       // Create an SVG container for the chart
       let svg = d3.select("#area-chart")
          .html("") // Clear the previous chart
