@@ -1,0 +1,837 @@
+<!DOCTYPE html>
+<html>
+<head>
+   <!-- CSS Import and 3 Script Imports to utilize Bootstrap -->
+   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.0.0/dist/css/bootstrap.min.css" integrity="sha384-Gn5384xqQ1aoWXA+058RXPxPg6fy4IWvTNh0E263XmFcJlSAwiGgFAW/dAiS6JXm" crossorigin="anonymous">
+   <script src="https://code.jquery.com/jquery-3.2.1.slim.min.js" integrity="sha384-KJ3o2DKtIkvYIK3UENzmM7KCkRr/rE9/Qpg6aAZGJwFDMVNA/GpGFF93hXpG5KkN" crossorigin="anonymous"></script>
+   <script src="https://cdn.jsdelivr.net/npm/popper.js@1.12.9/dist/umd/popper.min.js" integrity="sha384-ApNbgh9B+Y1QKtv3Rn7W3mgPxhU9K/ScQsAP7hUibX39j7fakFPskvXusvfa0b4Q" crossorigin="anonymous"></script>
+   <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.0.0/dist/js/bootstrap.min.js" integrity="sha384-JZR6Spejh4U02d8jOt6vLEHfe/JQGiRRSQQxSfFWpi1MquVdAyjUar5+76PVCmYl" crossorigin="anonymous"></script>
+   <script src="https://d3js.org/d3.v5.min.js"></script>
+   <script src="https://d3js.org/d3-array.v2.min.js"></script>
+
+   <style>
+      /* Increase the size of radio buttons */
+      .form-check-input[type="radio"] {
+        width: 15px; 
+        height: 15px; 
+      }
+
+      body {
+         background-color: #204860;
+      }
+    </style>
+
+</head>
+<body>
+      <div class="row">
+         <div class="col-3">
+            <br>
+            <br>
+            <br>
+            <div class="jumbotron">
+               <h2> Top 2023 Spotify Songs Analysis Dashboard </h2>
+               <p class="lead"> This is a data visualization dashboard in order to analyze the Top Spotify Songs Listened in 2023. </p>
+               <p class="lead"> Current Variable: <span style="font-weight: bold;" id="selectedVariable"> bpm </span> </p>
+               <button class="btn btn-secondary dropdown-toggle" type="button" id="dropdownMenuButton" data-display="static" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                  Select Variable 
+               </button>
+               <div class="dropdown-menu" aria-labelledby="dropdownMenuButton"></div>
+            </div>
+         </div>
+         <div class="col-5">
+            <div class="card text-center">
+               <div class="card-header">
+                  Parallel Coordinates
+               </div>
+               <div id="parallel-chart"></div>
+            </div>
+            <br>
+            <div class="card text-center">
+               <div class="card-header">
+                  Biplot
+               </div>
+               <div id="biplot-chart"></div>
+            </div>
+         </div>
+         <div class="col-4">
+            <br>
+            <br>
+            <br>
+            <div class="card text-center">
+               <div class="card-header">
+                  Bar Chart/Histogram 
+                  <br>
+               </div>
+               <div id="chart-container"></div>
+            </div>
+         </div>
+      </div>
+      <!--
+      <div class="card text-center">
+         <div class="card-header">
+            Data MDS
+         </div>
+         <div id="mds-chart"></div>
+      </div>
+      <div class="card text-center">
+         <div class="card-header">
+            Knee Graph to determine K clusters
+         </div>
+         <div id="knee-graph"></div>
+      </div>
+      <div class="card text-center">
+         <div class="card-header">
+            KMean Cluster Graphs
+         </div>
+         <div id="biplot-cluster-chart"></div>
+         <div id="mds-cluster-chart"></div>
+         <div id="parallel-cluster-chart"></div>
+      </div>
+      -->
+      <br>
+   <script>
+
+      let dataValues = []
+      let mdsVals = []
+      let biVals = []
+      let parallel = [] 
+      //This global dictionary will be used in the functions to determine color changes!
+      let colorRules = {"released_day":{},"bpm":{},"danceability_%":{},"valence_%":{},"energy_%":{},
+      "acousticness_%":{},"liveness_%":{},"speechiness_%":{},"mode":{}}
+
+      //This is where we generate all the graphs!
+      KneeGraph();
+
+      d3.csv("full_mds.csv").then(function(data){
+         mdsVals = data
+         createMDS(data);
+      })
+
+      d3.csv("allvals.csv").then(function(data) {
+         biVals = data
+         createBiplot(data)
+      })
+
+      d3.csv("parallel.csv").then(function(data) {
+         parallel = data
+         createParallelCoordinates(data)
+      })
+
+      d3.csv("9x9.csv").then(function(data) { 
+         dataValues.push(data)
+         // First get column values in order to populate the dropdown menu of variables (dictionary keys)
+         // The reason why we do dataValues[0][0] is because the whole data for some reason is in index 0, and then the 2nd index refers to each row. 
+         colValuesArr = Object.keys(dataValues[0][0]);
+         
+         // Grabs the dropdown-menu element. 
+         let dropdownMenu = document.querySelector(".dropdown-menu");
+         // Grabs selected variable.
+         let selectedVariable = document.getElementById("selectedVariable");
+         // For each column value, we need to add it as an entry to the variable dropdown menu. 
+         for (let column of colValuesArr) {
+            //variable is for dropdown menu, radio is for well to populate radio buttons.
+            let variable = document.createElement('a');
+            variable.className = 'dropdown-item';
+            variable.href = "#";
+            variable.id= column;
+            variable.textContent = column;
+            console.log(variable);
+            console.log(column)
+
+            if(column === "track_name" || column === "artist(s)_name"){
+               //Literally do nothing because we don't account for these attribtues according to Piazza.
+            }
+            else {
+               dropdownMenu.appendChild(variable);
+               // Add a click event listener to show which item is selected/active.
+               variable.addEventListener('click', function() {
+                   // Grab all items in the dropdownMenu.
+                  let dropdownItems = document.querySelectorAll('.dropdown-item');
+                  // Remove active status for all other variables!
+                  dropdownItems.forEach(item => {
+                     item.classList.remove('active');
+                  });
+                  // Make specific variable active.
+                  this.classList.add('active');
+                  selectedVariable.textContent = this.textContent;
+                  createBarChart(selectedVariable.textContent);
+                  //createPieChart(selectedVariable.textContent);
+               });
+            }
+         }
+         createBarChart("bpm");         
+         document.getElementById("bpm").classList.add("active")
+      });   
+
+      //Create random colors when clicking on a bar (auto-assign!)
+      function getRandomColor() {
+               let letters = '0123456789ABCDEF';
+               let color = '#';
+               for (var i = 0; i < 6; i++) {
+                  color += letters[Math.floor(Math.random() * 16)];
+               }
+               return color;
+               }
+
+      //Create Parallel Coordinates
+      function createParallelCoordinates(data) {
+         //Create color scheme for categorical variable.
+         let colors = d3.schemeCategory10;
+         //Finding attributes of each :> (we dont take in account mode since it is categorical
+         // Create attributes for the width and height :> 
+         let margin = {top: 30, right: 10, bottom: 10, left: 0},
+         width = 800 - margin.left - margin.right,
+         height = 200 - margin.top - margin.bottom;
+
+         // append the svg object to the body of the page
+         let svg = 
+         d3.select("#parallel-chart")
+         .html("") // Clear the previous chart
+         .append("svg")
+         .attr("width", width + margin.left + margin.right)
+         .attr("height", height + margin.top + margin.bottom)
+         .append("g")
+         .attr("transform", "translate(" + margin.left + "," + margin.top + ")")
+         .attr("viewbox", [-margin.left, -margin.top, width, height])
+         .attr("style", "max-width: 100%; height: auto; height: intrinsic;");
+
+         let attributes = ['energy_%', 'acousticness_%', 'danceability_%', 'valence_%', 'bpm', 'liveness_%', 'speechiness_%', 'released_day']
+         let y = {}
+         for (let i in attributes) {
+            let n = attributes[i]
+            y[n] = d3.scaleLinear()
+               .domain( d3.extent(data, function(d) { return +d[n]; }) )
+               .range([height, 0])
+         }
+
+         // Build the X scale -> it find the best position for each Y axis
+         let x = d3.scalePoint()
+         .range([0, width])
+         .padding(1)
+         .domain(attributes);
+
+         // The path function take a row of the csv as input, and return x and y coordinates of the line to draw for this raw.
+         function path(d) {
+            return d3.line()    
+            (attributes.map(function(p) { return [x(p), y[p](d[p])]; }));
+         }
+
+         // Draw the lines
+         svg
+         .selectAll("myPath")
+         .data(data)
+         .join("path")
+         .attr("d",  path)
+         .style("fill", "none")
+         .style("stroke", function (d) { 
+           //Default is major.
+           let retcolor = colors[0];
+               if(d.mode == "Minor"){
+                  retcolor = colors[1]
+               }
+               for (let key in colorRules) {
+                  //Each key is the attribute
+                  if(colorRules[key] != {}){
+                     //If this value exist in the key object... then we use that color!
+                     if(colorRules[key][d[key]]){
+                        retcolor = colorRules[key][d[key]]
+                     }
+                  }
+               }
+            return retcolor;
+         })  
+         .style("opacity", 0.5)
+
+         // Draw the axis:
+         svg.selectAll("myAxis")
+         .data(attributes).enter()
+         .append("g")
+         .attr("transform", function(d) { return "translate(" + x(d) + ")"; })
+         .each(function(d) { 
+            console.log(d)
+            d3.select(this).call(d3.axisLeft().scale(y[d])).selectAll("text").style("fill", "black");
+            d3.select(this).selectAll("line");
+            // Append axis title within the group, relative to the axis
+            d3.select(this)
+            .append("text")
+            .style("text-anchor", "middle")
+            .attr("y", 9)
+            .text(function(d) {
+            return d;
+            })
+         })
+
+         // Make legend for the chart!
+         let legendData = [
+            { label: 'Major', color: colors[0] },
+            { label: 'Minor', color: colors[1]},
+         ];
+
+         // Create a legend group
+         let legend = svg.append('g')
+            .attr('class', 'legend')
+            .attr('transform', `translate(${1300}, 10)`); // Adjust the position as needed
+
+         // Create legend rectangles and labels
+         legend.selectAll('rect')
+            .data(legendData)
+            .enter()
+            .append('rect')
+            .attr('x', 0)
+            .attr('y', (d, i) => i * 20)
+            .attr('width', 18)
+            .attr('height', 18)
+            .attr('fill', d => d.color);
+
+         legend.selectAll('text')
+            .data(legendData)
+            .enter()
+            .append('text')
+            .attr('x', 25)
+            .attr('y', (d, i) => i * 20 + 12)
+            .text(d => d.label)
+            .attr('font-size', '14px')
+      }
+
+      //Create MDS, it's literally just a scatterplot. 
+      function createMDS(data) {
+         colors = d3.schemeCategory10;
+         // Define the dimensions and margins for the biplot!
+         let margin = { top: 20, right: 20, bottom: 30, left: 40 };
+         let width = 1000 - margin.left - margin.right;
+         let height = 600 - margin.top - margin.bottom;
+
+         // Create an SVG container for the chart
+         let svg = d3.select("#mds-chart")
+            .html("") // Clear the previous chart
+            .append("svg")
+            .attr("width", width + margin.left + margin.right)
+            .attr("height", height + margin.top + margin.bottom)
+            .append("g")
+            .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+            
+         // Define x and y scales to be pca1 and pca2 respectively. 
+         let x = d3.scaleLinear()
+            .domain([-100, 100])
+            .range([0, width]);
+
+         let y = d3.scaleLinear()
+            .domain([-100, 100])
+            .range([height, 0]);
+
+         svg.selectAll("circle")
+            .data(data)
+            .enter().append("circle")
+            .attr("cx", d => x(d["X"]))
+            .attr("cy", d => y(d["Y"]))
+            .attr("r", 5)
+            .style("fill", function (d) { 
+               //Default is major.
+               let retcolor = colors[0];
+               if(d.mode == "Minor"){
+                  retcolor = colors[1]
+               }
+               for (let key in colorRules) {
+                  //Each key is the attribute
+                  if(colorRules[key] != {}){
+                     //If this value exist in the key object... then we use that color!
+                     if(colorRules[key][d[key]]){
+                        retcolor = colorRules[key][d[key]]
+                     }
+                  }
+               }
+               return retcolor;
+         })  
+         
+         // Add x and y axis
+         svg.append("g")
+            .attr("class", "x-axis")
+            .attr("transform", `translate(0,${height})`)
+            .call(d3.axisBottom(x).ticks(10));
+
+         svg.append("g")
+            .attr("class", "y-axis")
+            .call(d3.axisLeft(y).ticks(10));
+
+         // Add x-axis label
+         svg.append("text")
+            .attr("class", "x-label")
+            .attr("x", width / 2)
+            .attr("y", height + margin.bottom)
+            .style("text-anchor", "middle")
+            .text("Dimension 1");
+
+         // Add y-axis label
+         svg.append("text")
+            .attr("class", "y-label")
+            .attr("transform", "rotate(-90)")
+            .attr("y", 0 - margin.left)
+            .attr("x", 0 - height / 2)
+            .attr("dy", "1em")
+            .style("text-anchor", "middle")
+            .text("Dimension 2");
+         
+         // Make legend for the chart!
+         let legendData = [
+            { label: 'Major', color: colors[0] },
+            { label: 'Minor', color: colors[1]},
+         ];
+
+         // Create a legend group
+         let legend = svg.append('g')
+            .attr('class', 'legend')
+            .attr('transform', `translate(${1250}, 10)`); // Adjust the position as needed
+
+         // Create legend rectangles and labels
+         legend.selectAll('rect')
+            .data(legendData)
+            .enter()
+            .append('rect')
+            .attr('x', 0)
+            .attr('y', (d, i) => i * 20)
+            .attr('width', 18)
+            .attr('height', 18)
+            .attr('fill', d => d.color);
+
+         legend.selectAll('text')
+            .data(legendData)
+            .enter()
+            .append('text')
+            .attr('x', 25)
+            .attr('y', (d, i) => i * 20 + 12)
+            .text(d => d.label)
+            .attr('font-size', '14px')
+      }
+
+      //Create Biplot chart function
+      function createBiplot(data) {
+         colors = d3.schemeCategory10;
+         // Define the dimensions and margins for the biplot!
+         let margin = { top: 20, right: 20, bottom: 30, left: 40 };
+         let width = 600 - margin.left - margin.right;
+         let height = 200 - margin.top - margin.bottom;
+
+         //Grab pca values from pca.py 
+         let pca1 = [ 0.0747688 , -0.02331119 , 0.45272124 , 0.45263397 , 0.56772034 , -0.49502513 , 
+         0.065899 , 0.1110551 ]
+         let pca2 = [-0.07576657, 0.28615716, -0.49350796, -0.23868963, 0.3359524, -0.34386743, 0.45042108
+         , -0.42173769]
+
+         // Create an SVG container for the chart
+         let svg = d3.select("#biplot-chart")
+            .html("") // Clear the previous chart
+            .append("svg")
+            .attr("width", width + margin.left + margin.right)
+            .attr("height", height + margin.top + margin.bottom)
+            .append("g")
+            .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+            
+         // Define x and y scales to be pca1 and pca2 respectively. 
+         let x = d3.scaleLinear()
+            .domain([d3.min(pca1), d3.max(pca1)])
+            .range([0, width]);
+
+         let y = d3.scaleLinear()
+            .domain([d3.min(pca2), d3.max(pca2)])
+            .range([height, 0]);
+
+         svg.selectAll("circle")
+            .data(data)
+            .enter().append("circle")
+            .attr("cx", d => x(d["PCA1"]))
+            .attr("cy", d => y(d["PCA2"]))
+            .attr("r", 5)
+            .style("fill", function (d) { 
+               //Default is major.
+               let retcolor = colors[0];
+               if(d.mode == "Minor"){
+                  retcolor = colors[1]
+               }
+               for (let key in colorRules) {
+                  //Each key is the attribute
+                  if(colorRules[key] != {}){
+                     //If this value exist in the key object... then we use that color!
+                     if(colorRules[key][d[key]]){
+                        retcolor = colorRules[key][d[key]]
+                     }
+                  }
+               }
+               return retcolor;
+         })  
+         
+         // Add x and y axis
+         svg.append("g")
+            .attr("class", "x-axis")
+            .attr("transform", `translate(0,${height})`)
+            .call(d3.axisBottom(x).ticks(5));
+
+         svg.append("g")
+            .attr("class", "y-axis")
+            .call(d3.axisLeft(y).ticks(5));
+
+         // Add x-axis label
+         svg.append("text")
+            .attr("class", "x-label")
+            .attr("x", width / 2)
+            .attr("y", height + margin.bottom)
+            .style("text-anchor", "middle")
+            .text("PCA 1");
+
+         // Add y-axis label
+         svg.append("text")
+            .attr("class", "y-label")
+            .attr("transform", "rotate(-90)")
+            .attr("y", 0 - margin.left)
+            .attr("x", 0 - height / 2)
+            .attr("dy", "1em")
+            .style("text-anchor", "middle")
+            .text("PCA 2");
+
+         //Plot loading vectors/arrows
+         /*
+                 PC1       PC2
+                  0 -0.074769 -0.075767
+                  1  0.023311  0.286157
+                  2 -0.452721 -0.493508
+                  3 -0.452634 -0.238690
+                  4 -0.567720  0.335952
+                  5  0.495025 -0.343867
+                  6 -0.065899  0.450421
+                  7 -0.111055 -0.421738   */
+         let arrows = [[-0.074769, -0.075767],
+                        [ 0.023311,  0.286157],
+                        [-0.452721, -0.493508],
+                        [-0.452634, -0.238690],
+                        [-0.567720,  0.335952],
+                        [ 0.495025, -0.343867],
+                        [-0.065899,  0.450421],
+                        [-0.111055, -0.421738]]
+         let order = ["released_day", "bpm", "danceability", "valence", "energy", "acousticness", "liveness", "speechiness"]
+         
+         arrows.forEach((arrow, index) => {
+            svg.append("line")
+               .attr("x1", x(0))  
+               .attr("y1", y(0))  
+               .attr("x2", x(arrow[0]))  
+               .attr("y2", y(arrow[1])) 
+               .attr("stroke", "black")
+               .attr("stroke-width", 2);
+
+            svg.append("text")
+               .attr("x", x(arrow[0]))
+               .attr("y", y(arrow[1]))
+               .text(order[index])  
+               .attr("font-size", "12px")
+               .attr("dx", 5)
+               .attr("dy", -5);
+         });
+         
+         // Make legend for the chart!
+         let legendData = [
+            { label: 'Major', color: colors[0] },
+            { label: 'Minor', color: colors[1]},
+         ];
+
+         // Create a legend group
+         let legend = svg.append('g')
+            .attr('class', 'legend')
+            .attr('transform', `translate(${1250}, 10)`); // Adjust the position as needed
+
+         // Create legend rectangles and labels
+         legend.selectAll('rect')
+            .data(legendData)
+            .enter()
+            .append('rect')
+            .attr('x', 0)
+            .attr('y', (d, i) => i * 20)
+            .attr('width', 18)
+            .attr('height', 18)
+            .attr('fill', d => d.color);
+
+         legend.selectAll('text')
+            .data(legendData)
+            .enter()
+            .append('text')
+            .attr('x', 25)
+            .attr('y', (d, i) => i * 20 + 12)
+            .text(d => d.label)
+            .attr('font-size', '14px')
+      }
+
+      //Create Bar chart function which will be used in an eventlistener. 
+      function createBarChart(selectedVariable) {
+        
+         // Define the dimensions and margins for the bar chart!
+         let margin = { top: 20, right: 20, bottom: 30, left: 40 };
+         let width = 450 - margin.left - margin.right;
+         let height = 200 - margin.top - margin.bottom;
+
+         // Create an SVG container for the chart
+         let svg = d3.select("#chart-container")
+            .html("") // Clear the previous chart
+            .append("svg")
+            .attr("width", width + margin.left + margin.right)
+            .attr("height", height + margin.top + margin.bottom)
+            .append("g")
+            .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+
+         // Create an array of all the data values for the selected variable, this is empty and will be changed depending on whether
+         // the selected variable is categorical or numerical.
+         let selectedData = []
+
+         //There are only 5 variables that classify as categorical data. (But after the piazza post, artist and track_name were omitted.)
+         //artist count was added since the values (1,2,4,3) are very similar - and graphing with this algorithm is better. 
+         if(selectedVariable == "key" || selectedVariable == "mode" || selectedVariable == "artist_count" ){
+            selectedData = dataValues[0].map(row => ({
+               label: row[selectedVariable], //Uses the row value as the label (e.g. artist name)
+               frequency: dataValues[0].filter(item => item[selectedVariable] === row[selectedVariable]).length //filter is used to find the # of times the label is found in the dataset.
+            }))
+            //Sort labels
+            selectedData.sort((a, b) => d3.ascending(a.label, b.label));
+            console.log(selectedData);
+
+            // Define x and y scales
+            let x = d3.scaleBand()
+                  .range([0, width])
+                  .domain(selectedData.map(d => d.label))
+                  .padding(0.1);
+
+            let y = d3.scaleLinear()
+                  .range([height, 0])
+                  .domain([0, d3.max(selectedData, d => d.frequency)]);
+
+            // Create bars
+            svg.selectAll(".bar")
+                  .data(selectedData)
+                  .enter().append("rect")
+                  .attr("class", "bar")
+                  .attr("x", d => x(d.label))
+                  .attr("width", x.bandwidth())
+                  .attr("y", d => y(d.frequency))
+                  .attr("height", d => height - y(d.frequency))
+                  .attr("fill", "steelblue")
+                  .on("click", function(d) {
+                  // Assign a color
+                  let assignedColor = getRandomColor();
+
+                  // Update bar chart
+                  d3.select(this).style("fill", assignedColor)
+                  .each(function(d, i){
+                     // 'd' is the data associated with the bar, 'i' is the index
+                     console.log("Data for this bar:", d);
+                     console.log("Index of this bar:", i);
+
+                     no_dups = new Set(d)
+                     console.log(no_dups)
+                     //For these values, add a specific corresponding color to the colorrules!
+                     for (let val of no_dups ) {
+                        let variable = document.getElementById("selectedVariable");
+                        colorRules[variable.textContent][val] = assignedColor 
+                     }
+                     createBiplot(biVals)
+                     console.log(biVals)
+                     createMDS(mdsVals)
+                     createParallelCoordinates(parallel)
+                  });
+               });
+
+            //Reset color logic
+            d3.select("button.reset")
+               .on("click", function() {
+               svg.selectAll(".bar").style("fill","steelblue");
+            });
+
+            // Add x and y axis
+            svg.append("g")
+                  .attr("class", "x-axis")
+                  .attr("transform", "translate(0," + height + ")")
+                  .call(d3.axisBottom(x));
+
+            // Add x-axis label
+            svg.append("text")
+            .attr("class", "x-label")
+            .attr("x", width / 2)
+            .attr("y", height + margin.bottom)
+            .style("text-anchor", "middle")
+            .text(selectedVariable);
+
+            svg.append("g")
+                  .attr("class", "y-axis")
+                  .call(d3.axisLeft(y));
+
+            // Add y-axis label
+            svg.append("text")
+               .attr("class", "y-label")
+               .attr("transform", "rotate(-90)")
+               .attr("y", 0 - margin.left) // Adjust the position as needed
+               .attr("x", 0 - height / 2) // Adjust the position as needed
+               .attr("dy", "1em")
+               .style("text-anchor", "middle")
+               .text("Frequency");
+         }
+         //For numerical data, the value is quite literally the numerical value given itself, but we need to bin this value - which makes the y-axis
+         //represent frequency as well. 
+         else {
+            selectedData = dataValues[0].map(row => parseFloat(row[selectedVariable]))
+            if(selectedVariable == "streams"){
+               selectedData = dataValues[0].map(row => Number(row[selectedVariable]))
+            }
+            console.log(selectedData);
+            
+            let histogram = d3.histogram()
+               .value(d => d)
+               .domain(d3.extent(selectedData));
+
+            let bins = histogram(selectedData);
+            console.log(bins)
+
+            // Create scales for x and y
+            let x = d3.scaleLinear()
+               .domain([d3.min(selectedData), d3.max(selectedData)])
+               .range([0, width]);
+
+            let y = d3.scaleLinear()
+               .domain([0, d3.max(bins, d => d.length)])
+               .nice()
+               .range([height, 0]);
+
+            // Graph the histogram.
+            svg.selectAll("rect")
+               .data(bins)
+               .enter()
+               .append("rect")
+               .attr("x", d => x(d.x0))
+               .attr("y", d => y(d.length))
+               .attr("width", d => x(d.x1) - x(d.x0) - 1)
+               .attr("height", d => height - y(d.length))
+               .attr("fill", "steelblue")
+               .on("click", function(d) {
+                  // Assign a color
+                  let assignedColor = getRandomColor();
+
+                  // Update bar chart
+                  d3.select(this).style("fill", assignedColor)
+                  .each(function(d, i){
+                     // 'd' is the data associated with the bar, 'i' is the index
+                     console.log("Data for this bar:", d);
+                     console.log("Index of this bar:", i);
+
+                     no_dups = new Set(d)
+                     console.log(no_dups)
+                     //For these values, add a specific corresponding color to the colorrules!
+                     for (let val of no_dups ) {
+                        let variable = document.getElementById("selectedVariable");
+                        colorRules[variable.textContent][val] = assignedColor 
+                        createBiplot(biVals)
+                        createMDS(mdsVals)
+                        createParallelCoordinates(parallel)
+                     }
+                  });
+               });
+            
+            //Reset color logic
+            d3.select("button.reset")
+               .on("click", function() {
+               svg.selectAll("rect").style("fill","steelblue");
+               console.log(svg.selectAll("rect").data());
+            });
+
+            // Add x-axis
+            svg.append("g")
+               .attr("class", "x-axis")
+               .attr("transform", `translate(0,${height})`)
+               .call(d3.axisBottom(x));
+
+            // Add x-axis label
+            svg.append("text")
+               .attr("class", "x-label")
+               .attr("x", width / 2)
+               .attr("y", height + margin.bottom)
+               .style("text-anchor", "middle")
+               .text(selectedVariable);
+
+            // Add y-axis
+            svg.append("g")
+               .attr("class", "y-axis")
+               .call(d3.axisLeft(y));
+
+            // Add y-axis label
+            svg.append("text")
+               .attr("class", "y-label")
+               .attr("transform", "rotate(-90)")
+               .attr("y", 0 - margin.left) // Adjust the position as needed
+               .attr("x", 0 - height / 2) // Adjust the position as needed
+               .attr("dy", "1em")
+               .style("text-anchor", "middle")
+               .text("Frequency");
+         }
+      }
+
+      function KneeGraph(){
+         // Values were obtained from kclusters.py
+         sse = [2735371.9328436516, 2145764.0790006258, 1743222.4029645612, 1513304.310152806, 1390860.4559750983, 1296780.3773526729, 1218170.093420315, 1158339.8632234277, 1105012.2760171192, 1061949.1456475472]
+         
+         // Define the dimensions and margins for the knee graph.
+         let margin = { top: 20, right: 20, bottom: 30, left: 100 };
+         let width = 1000 - margin.left - margin.right;
+         let height = 600 - margin.top - margin.bottom;
+
+         // Create an SVG container for the chart
+         let svg = d3.select("#knee-graph")
+            .html("") // Clear the previous chart
+            .append("svg")
+            .attr("width", width + margin.left + margin.right)
+            .attr("height", height + margin.top + margin.bottom)
+            .append("g")
+            .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+         
+         // Plot the elbow curve
+         let xScale = d3.scaleLinear().domain([1, sse.length]).range([0, width]);
+         let yScale = d3.scaleLinear().domain([0, d3.max(sse)]).range([height, 0]);
+
+         let line = d3.line()
+            .x((d, i) => xScale(i + 1))
+            .y(d => yScale(d));
+
+         //Alternatively, we could have used lines and circles but path is much more simpler!
+         svg.append("path")
+            .data([sse])
+            .attr("d", line)
+            .attr("fill", "none")
+            .attr("stroke", "black");
+
+         //This is where the elbow is, we know this is 4 by looking at it and from the python code, 
+         //so it will be hardcoded in to make it much easier to look at for
+         svg.append("circle")
+         .attr("cx", d => xScale(4))
+         .attr("cy", d => yScale(1513304.310152806))
+         .attr("r", 5)
+         .style("fill", "red")
+         
+         // Add x and y axes
+         svg.append("g")
+            .attr("transform", "translate(0," + height + ")")
+            .call(d3.axisBottom(xScale));
+
+         svg.append("g")
+            .call(d3.axisLeft(yScale));
+
+         // Add labels
+         svg.append("text")
+            .attr("transform", "translate(" + (width / 2) + " ," + (height + 30) + ")")
+            .style("text-anchor", "middle")
+            .text("Number of Clusters (k)");
+
+         svg.append("text")
+            .attr("transform", "rotate(-90)")
+            .attr("y", 0 - 50)
+            .attr("x", 0 - (height / 2))
+            .attr("dy", "1em")
+            .style("text-anchor", "middle")
+            .text("Sum of Squared Distances");
+         
+      }
+
+</script>
+</body>
+</html>
